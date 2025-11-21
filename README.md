@@ -150,3 +150,93 @@ You will see the following sequence in the output of the sitl_test script:
 - Command the vehicle to Return To Land (RTL)
 
 See the comments in the script for more detail on usage.
+
+## Message Signing (MAVLink 2 Security)
+
+MAVLink 2 supports message signing to verify message authenticity and prevent unauthorized access. This library provides full support for signing and verifying messages.
+
+### Basic Signing Setup
+
+```dart
+import 'package:dart_mavlink/mavlink.dart';
+import 'package:dart_mavlink/dialects/common.dart';
+import 'dart:typed_data';
+
+// Create a 32-byte secret key (must be shared securely between systems)
+final secretKey = Uint8List(32);
+// ... populate secret key from secure source ...
+
+// Configure signing with a secret key and link ID
+final signatureConfig = MavlinkSignatureConfig(
+  secretKey: secretKey,
+  linkId: 1,
+  acceptPolicy: SignatureAcceptPolicy.signedOnly, // Only accept signed packets
+);
+
+// Create signature manager
+final signatureManager = MavlinkSignatureManager(signatureConfig);
+```
+
+### Sending Signed Messages
+
+```dart
+// Create a message
+final heartbeat = Heartbeat(
+  type: mavTypeQuadrotor,
+  autopilot: mavAutopilotArdupilotmega,
+  baseMode: mavModeFlagCustomModeEnabled,
+  customMode: 0,
+  systemStatus: mavStateActive,
+  mavlinkVersion: 3,
+);
+
+// Create signed frame by passing the signature manager
+final frame = MavlinkFrame.v2(0, 1, 255, heartbeat,
+  signatureManager: signatureManager);
+
+// Serialize and send (signature is automatically added)
+final bytes = frame.serialize();
+socket.add(bytes);
+```
+
+### Receiving and Verifying Signed Messages
+
+```dart
+// Create parser with signature manager for automatic verification
+final parser = MavlinkParser(
+  MavlinkDialectCommon(),
+  signatureManager: signatureManager,
+);
+
+parser.stream.listen((MavlinkFrame frame) {
+  // Only correctly signed messages will reach here
+  // (based on acceptPolicy)
+  print("Verified message: ${frame.message.runtimeType}");
+});
+
+// Parse incoming data
+parser.parse(receivedBytes);
+```
+
+### Signature Accept Policies
+
+Three policies are available for handling unsigned or incorrectly signed packets:
+
+```dart
+// Accept only correctly signed packets (most secure)
+SignatureAcceptPolicy.signedOnly
+
+// Accept unsigned packets, but reject incorrectly signed packets
+// (useful during transition to signed communications)
+SignatureAcceptPolicy.acceptUnsigned
+
+// Accept all packets regardless of signature (disables verification)
+SignatureAcceptPolicy.acceptAll
+```
+
+### Security Considerations
+
+- **Secret Key**: Must be exactly 32 bytes and shared securely between systems (e.g., via USB, not over MAVLink)
+- **Link ID**: Identifies the communication channel; different links can use different keys
+- **Timestamps**: Automatically managed to prevent replay attacks
+- **MAVLink v1**: Does not support signing; only MAVLink v2 frames can be signed
