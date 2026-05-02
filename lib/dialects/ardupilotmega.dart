@@ -3808,6 +3808,36 @@ const MavCmd mavCmdPayloadControlDeploy = 30002;
 /// MAV_CMD_FIXED_MAG_CAL_YAW
 const MavCmd mavCmdFixedMagCalYaw = 42006;
 
+/// Initiate a magnetometer calibration.
+/// param1: Bitmask of magnetometers to calibrate (0=all)
+/// param2: Retry on failure (0=no, 1=yes)
+/// param3: Autosave on success (0=no, 1=yes)
+/// param4: Delay before starting (seconds)
+/// param5: Autoreboot count (0=never)
+///
+/// MAV_CMD_DO_START_MAG_CAL
+const MavCmd mavCmdDoStartMagCal = 42424;
+
+/// Accept a magnetometer calibration.
+/// param1: Bitmask of magnetometers to accept (0=all)
+///
+/// MAV_CMD_DO_ACCEPT_MAG_CAL
+const MavCmd mavCmdDoAcceptMagCal = 42425;
+
+/// Cancel a magnetometer calibration.
+/// param1: Bitmask of magnetometers to cancel (0=all)
+///
+/// MAV_CMD_DO_CANCEL_MAG_CAL
+const MavCmd mavCmdDoCancelMagCal = 42426;
+
+/// Used when doing accelerometer calibration. When sent to the GCS tells it what
+/// position to put the vehicle in. When sent to the vehicle says what position
+/// the vehicle is in.
+/// param1: Position (ACCELCAL_VEHICLE_POS enum)
+///
+/// MAV_CMD_ACCELCAL_VEHICLE_POS
+const MavCmd mavCmdAccelcalVehiclePos = 42429;
+
 /// Command to operate winch.
 ///
 /// MAV_CMD_DO_WINCH
