@@ -362,6 +362,69 @@ void main() {
       );
     });
 
+    test('signedOnly accepts allowlisted unsigned messages (RADIO_STATUS)',
+        () {
+      final manager = MavlinkSignatureManager(MavlinkSignatureConfig(
+        secretKey: Uint8List(32),
+        linkId: 1,
+        acceptPolicy: SignatureAcceptPolicy.signedOnly,
+      ));
+
+      // RADIO_STATUS (109) is allowlisted by default — SiK radios emit it
+      // unsigned even on a signed link.
+      expect(
+        manager.shouldAcceptPacket(
+            isSigned: false, signatureValid: false, messageId: kMsgIdRadioStatus),
+        isTrue,
+      );
+      // A non-allowlisted unsigned message is still rejected.
+      expect(
+        manager.shouldAcceptPacket(
+            isSigned: false, signatureValid: false, messageId: 0 /* HEARTBEAT */),
+        isFalse,
+      );
+      // The allowlist never rescues an incorrectly *signed* packet.
+      expect(
+        manager.shouldAcceptPacket(
+            isSigned: true, signatureValid: false, messageId: kMsgIdRadioStatus),
+        isFalse,
+      );
+    });
+
+    test('custom allowlist overrides the RADIO_STATUS default', () {
+      final manager = MavlinkSignatureManager(MavlinkSignatureConfig(
+        secretKey: Uint8List(32),
+        linkId: 1,
+        acceptPolicy: SignatureAcceptPolicy.signedOnly,
+        unsignedAllowlist: const {0}, // HEARTBEAT only
+      ));
+
+      expect(
+        manager.shouldAcceptPacket(
+            isSigned: false, signatureValid: false, messageId: 0),
+        isTrue,
+      );
+      expect(
+        manager.shouldAcceptPacket(
+            isSigned: false, signatureValid: false, messageId: kMsgIdRadioStatus),
+        isFalse,
+      );
+    });
+
+    test('signedOnly with no messageId still rejects unsigned (back-compat)',
+        () {
+      final manager = MavlinkSignatureManager(MavlinkSignatureConfig(
+        secretKey: Uint8List(32),
+        linkId: 1,
+        acceptPolicy: SignatureAcceptPolicy.signedOnly,
+      ));
+
+      expect(
+        manager.shouldAcceptPacket(isSigned: false, signatureValid: false),
+        isFalse,
+      );
+    });
+
     test('acceptUnsigned accepts unsigned packets', () {
       final secretKey = Uint8List(32);
       final config = MavlinkSignatureConfig(

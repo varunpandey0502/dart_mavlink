@@ -296,7 +296,10 @@ class MavlinkParser {
 
       // Check if packet should be accepted based on signature policy
       if (_signatureManager != null) {
-        if (!_signatureManager!.shouldAcceptPacket(isSigned: true, signatureValid: signatureValid)) {
+        if (!_signatureManager!.shouldAcceptPacket(
+            isSigned: true,
+            signatureValid: signatureValid,
+            messageId: _messageId)) {
           // Reject packet due to signature policy
           return false;
         }
@@ -304,7 +307,10 @@ class MavlinkParser {
     } else {
       // Unsigned packet
       if (_signatureManager != null) {
-        if (!_signatureManager!.shouldAcceptPacket(isSigned: false, signatureValid: false)) {
+        if (!_signatureManager!.shouldAcceptPacket(
+            isSigned: false,
+            signatureValid: false,
+            messageId: _messageId)) {
           // Reject unsigned packet due to policy
           return false;
         }

@@ -15,6 +15,11 @@ enum SignatureAcceptPolicy {
   acceptAll,
 }
 
+/// RADIO_STATUS message id. SiK telemetry radios inject this unsigned even
+/// on an otherwise-signed link, so it is allowlisted by default — matching
+/// QGC's `insecureConnectionAcceptUnsignedCallback`.
+const int kMsgIdRadioStatus = 109;
+
 /// Configuration for MAVLink message signing
 class MavlinkSignatureConfig {
   /// 32-byte secret key for signature generation/verification
@@ -26,11 +31,23 @@ class MavlinkSignatureConfig {
   /// Policy for accepting unsigned/incorrectly signed packets
   final SignatureAcceptPolicy acceptPolicy;
 
+  /// Message IDs accepted even when unsigned under
+  /// [SignatureAcceptPolicy.signedOnly].
+  ///
+  /// Defaults to `{109}` (RADIO_STATUS), which SiK radios emit unsigned on
+  /// the GCS-side link regardless of the vehicle's signing state. Without
+  /// this, `signedOnly` is unusable on radio links — the very links that
+  /// most need signing. An incorrectly *signed* packet is still rejected;
+  /// the allowlist only relaxes the "must be signed" requirement, and only
+  /// for these ids.
+  final Set<int> unsignedAllowlist;
+
   MavlinkSignatureConfig({
     required this.secretKey,
     required this.linkId,
     this.acceptPolicy = SignatureAcceptPolicy.signedOnly,
-  }) {
+    Set<int>? unsignedAllowlist,
+  }) : unsignedAllowlist = unsignedAllowlist ?? const {kMsgIdRadioStatus} {
     if (secretKey.length != 32) {
       throw ArgumentError('Secret key must be exactly 32 bytes');
     }
@@ -218,14 +235,26 @@ class MavlinkSignatureManager {
     return true;
   }
 
-  /// Check if a packet should be accepted based on signature verification result and policy
+  /// Check if a packet should be accepted based on signature verification
+  /// result and policy.
+  ///
+  /// [messageId] lets [SignatureAcceptPolicy.signedOnly] still accept a
+  /// small allowlist of unsigned messages (default: RADIO_STATUS) that
+  /// some hardware emits unsigned. Pass null to skip the allowlist check
+  /// (back-compat for callers that don't have the id).
   bool shouldAcceptPacket({
     required bool isSigned,
     required bool signatureValid,
+    int? messageId,
   }) {
     switch (config.acceptPolicy) {
       case SignatureAcceptPolicy.signedOnly:
-        return isSigned && signatureValid;
+        if (isSigned) return signatureValid;
+        // Unsigned: accept only if explicitly allowlisted. An incorrectly
+        // signed packet never reaches here as unsigned, so the allowlist
+        // can't be abused to slip a forged signature past verification.
+        return messageId != null &&
+            config.unsignedAllowlist.contains(messageId);
 
       case SignatureAcceptPolicy.acceptUnsigned:
         if (!isSigned) {
